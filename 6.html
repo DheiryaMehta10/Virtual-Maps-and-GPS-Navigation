@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>🚀 Ultimate GPS Navigator Pro</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --glass: rgba(255, 255, 255, 0.85);
+        }
+
+        body, html { margin: 0; padding: 0; font-family: 'Inter', sans-serif; height: 100%; overflow: hidden; background: #000; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+
+        /* Modern Glass Dashboard */
+        .glass-panel {
+            position: absolute; z-index: 1000;
+            background: var(--glass); backdrop-filter: blur(15px);
+            border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 20px;
+        }
+
+        .top-left { top: 20px; left: 20px; width: 320px; transition: transform 0.3s ease; }
+
+        .status-badge { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9em; margin-bottom: 15px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; }
+        .dot-active { background: var(--success); box-shadow: 0 0 12px var(--success); animation: pulse 2s infinite; }
+
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        .metric-box { background: white; padding: 12px; border-radius: 15px; text-align: center; }
+        .m-val { display: block; font-size: 1.4em; font-weight: 800; color: var(--primary); }
+        .m-lab { font-size: 0.65em; font-weight: 600; color: #64748b; text-transform: uppercase; }
+
+        /* Search & Navigation Bar */
+        .search-bar {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 500px; display: flex; gap: 8px; z-index: 1000;
+        }
+        .search-input {
+            flex: 1; padding: 16px 20px; border-radius: 50px; border: none;
+            background: var(--glass); backdrop-filter: blur(15px); box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            outline: none; font-weight: 500;
+        }
+
+        /* Buttons */
+        .btn {
+            border: none; border-radius: 15px; cursor: pointer; font-weight: 700;
+            transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-round { width: 55px; height: 55px; border-radius: 50%; font-size: 1.2em; }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+        .btn-track-active { background: var(--danger) !important; color: white; }
+        .btn-full { width: 100%; padding: 14px; margin-top: 5px; }
+
+        /* Compass */
+        #compass-ui {
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            width: 60px; height: 60px; background: var(--glass); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5em; color: var(--danger); box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s cubic-bezier(0.1, 0.7, 0.1, 1);
+        }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="compass-ui"><i class="fas fa-location-arrow"></i></div>
+
+    <div class="glass-panel top-left">
+        <div class="status-badge">
+            <div id="statusDot" class="dot"></div>
+            <span id="statusText">GPS DISCONNECTED</span>
+        </div>
+        
+        <div class="metrics-grid">
+            <div class="metric-box">
+                <span id="speed" class="m-val">0.0</span>
+                <span class="m-lab">KM/H</span>
+            </div>
+            <div class="metric-box">
+                <span id="accuracy" class="m-val">--</span>
+                <span class="m-lab">Acc (M)</span>
+            </div>
+        </div>
+
+        <button id="trackBtn" class="btn btn-primary btn-full" onclick="toggleTracking()">
+            <i class="fas fa-satellite"></i> Start Live Tracking
+        </button>
+        <button class="btn btn-full" style="background: white; color: #444;" onclick="location.reload()">
+            <i class="fas fa-redo"></i> Reset System
+        </button>
+    </div>
+
+    <div class="search-bar">
+        <input type="text" id="destination" class="search-input" placeholder="Search address or tap map...">
+        <button class="btn btn-primary btn-round" onclick="searchLocation()">
+            <i class="fas fa-search"></i>
+        </button>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        // App Core Configuration
+        const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        let watchId = null;
+        let userMarker = null;
+        let userCoords = null;
+        let routingControl = null;
+        let trail = L.polyline([], {color: '#6366f1', weight: 4, opacity: 0.6, dashArray: '10, 10'}).addTo(map);
+
+        // --- 1. SEARCH LOGIC (Address Searching) ---
+        async function searchLocation() {
+            const query = document.getElementById('destination').value;
+            if (!query) return alert("Please enter an address!");
+            if (!userCoords) return alert("Enable tracking to set your starting point!");
+
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                if (data.length > 0) {
+                    const dest = [data[0].lat, data[0].lon];
+                    startNavigation(dest);
+                    document.getElementById('destination').value = data[0].display_name;
+                } else {
+                    alert("Location not found.");
+                }
+            } catch (err) {
+                alert("Search failed. Check your connection.");
+            }
+        }
+
+        // --- 2. LIVE TRACKING & COMPASS ---
+        function toggleTracking() {
+            const btn = document.getElementById('trackBtn');
+            const dot = document.getElementById('statusDot');
+            
+            if (!watchId) {
+                if ("geolocation" in navigator) {
+                    watchId = navigator.geolocation.watchPosition(updateGPS, handleError, {
+                        enableHighAccuracy: true,
+                        maximumAge: 1000
+                    });
+                    btn.innerHTML = '<i class="fas fa-stop"></i> Stop Tracking';
+                    btn.classList.add('btn-track-active');
+                    dot.classList.add('dot-active');
+                    document.getElementById('statusText').innerText = "LIVE SIGNAL LOCKED";
+                }
+            } else {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                btn.innerHTML = '<i class="fas fa-satellite"></i> Start Live Tracking';
+                btn.classList.remove('btn-track-active');
+                dot.classList.remove('dot-active');
+                document.getElementById('statusText').innerText = "TRACKING PAUSED";
+            }
+        }
+
+        function updateGPS(position) {
+            const { latitude, longitude, speed, heading, accuracy } = position.coords;
+            userCoords = [latitude, longitude];
+
+            // Update UI Metrics
+            document.getElementById('speed').innerText = speed ? (speed * 3.6).toFixed(1) : "0.0";
+            document.getElementById('accuracy').innerText = accuracy.toFixed(0);
+
+            // Update Marker & Map View
+            if (!userMarker) {
+                userMarker = L.circleMarker(userCoords, {
+                    radius: 12, color: 'white', fillColor: '#6366f1', fillOpacity: 1, weight: 4
+                }).addTo(map);
+                map.setView(userCoords, 17);
+            } else {
+                userMarker.setLatLng(userCoords);
+            }
+
+            // Real-time Trail
+            trail.addLatLng(userCoords);
+
+            // Dynamic Compass Rotation
+            if (heading) {
+                document.getElementById('compass-ui').style.transform = `rotate(${heading}deg)`;
+            }
+
+            // Keep user centered during movement
+            if (routingControl) map.panTo(userCoords);
+        }
+
+        // --- 3. NAVIGATION LOGIC ---
+        function startNavigation(destination) {
+            if (routingControl) map.removeControl(routingControl);
+
+            routingControl = L.Routing.control({
+                waypoints: [L.latLng(userCoords), L.latLng(destination)],
+                lineOptions: { styles: [{ color: '#10b981', weight: 7, opacity: 0.9 }] },
+                createMarker: function(i, wp) {
+                    return L.marker(wp.latLng).bindPopup(i === 0 ? "Start Point" : "Your Destination");
+                }
+            }).addTo(map);
+
+            map.setView(userCoords, 16);
+        }
+
+        // Map Interaction: Tap to set destination
+        map.on('click', function(e) {
+            if (userCoords) {
+                startNavigation([e.latlng.lat, e.latlng.lng]);
+            } else {
+                alert("Start Tracking first!");
+            }
+        });
+
+        function handleError(err) {
+            console.warn(err);
+            document.getElementById('statusText').innerText = "GPS ERROR";
+        }
+    </script>
+</body>
+</html>
