@@ -218,6 +218,25 @@
                 lineOptions: { styles: [{ color: '#10b981', weight: 6 }] }
             }).addTo(map);
         }
+        async function syncTripToCloud() {
+            const tripData = {
+                startTime: new Date().toISOString(),
+                coordinates: trail.getLatLngs(), // Gets the trail points from the map
+                distance: "2.4 km" // You can calculate this from the trail
+        };
+
+        try {
+            const response = await fetch('http://localhost:3000/api/save-trip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(tripData)
+            });
+            const result = await response.json();
+            alert(result.message);
+        } catch (err) {
+            console.error("Cloud sync failed", err);
+    }
+}
 
         renderFavorites();
     </script>
