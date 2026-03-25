@@ -1,4 +1,6 @@
 # 🚀 Virtual-Maps-and-GPS-Navigation
+
+# "Precision meets elegance. Navigate your world with a glassmorphism interface designed for the modern explorer."
 ProA sleek, high-performance web-based GPS tracking and navigation interface built with Leaflet.js. This application features a modern "glassmorphism" UI, real-time geolocation tracking, and dynamic routing capabilities.
 
 # ✨ FEATURES
