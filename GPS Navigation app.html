@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>🚀 Ultimate GPS Navigator Pro +</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --glass: rgba(255, 255, 255, 0.85);
+            --text: #1e293b;
+            --bg-panel: white;
+        }
+
+        /* Dark Mode Variables */
+        body.dark-mode {
+            --glass: rgba(30, 41, 59, 0.85);
+            --text: #f8fafc;
+            --bg-panel: #0f172a;
+        }
+
+        body, html { margin: 0; padding: 0; font-family: 'Inter', sans-serif; height: 100%; overflow: hidden; background: #000; transition: background 0.3s; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+
+        .glass-panel {
+            position: absolute; z-index: 1000;
+            background: var(--glass); backdrop-filter: blur(15px);
+            border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 20px; color: var(--text);
+        }
+
+        .top-left { top: 20px; left: 20px; width: 320px; }
+        
+        /* Favorites Sidebar */
+        .favorites-panel {
+            top: 20px; right: 90px; width: 200px; max-height: 40vh; overflow-y: auto;
+        }
+        .fav-item { 
+            padding: 8px; border-bottom: 1px solid rgba(0,0,0,0.1); 
+            cursor: pointer; font-size: 0.85em; display: flex; justify-content: space-between;
+        }
+        .fav-item:hover { color: var(--primary); }
+
+        .status-badge { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9em; margin-bottom: 15px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; }
+        .dot-active { background: var(--success); box-shadow: 0 0 12px var(--success); animation: pulse 2s infinite; }
+
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
+        .metric-box { background: var(--bg-panel); padding: 12px; border-radius: 15px; text-align: center; color: var(--text); }
+        .m-val { display: block; font-size: 1.4em; font-weight: 800; color: var(--primary); }
+        .m-lab { font-size: 0.65em; font-weight: 600; opacity: 0.7; text-transform: uppercase; }
+
+        .search-bar {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 500px; display: flex; gap: 8px; z-index: 1000;
+        }
+        .search-input {
+            flex: 1; padding: 16px 20px; border-radius: 50px; border: none;
+            background: var(--glass); backdrop-filter: blur(15px); color: var(--text);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1); outline: none;
+        }
+
+        .btn { border: none; border-radius: 15px; cursor: pointer; font-weight: 700; transition: 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-round { width: 55px; height: 55px; border-radius: 50%; font-size: 1.2em; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-track-active { background: var(--danger) !important; }
+
+        #compass-ui {
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            width: 60px; height: 60px; background: var(--glass); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5em; color: var(--danger); box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
+</head>
+<body class="light-mode">
+
+    <div id="compass-ui" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></div>
+
+    <div class="glass-panel top-left">
+        <div class="status-badge">
+            <div id="statusDot" class="dot"></div>
+            <span id="statusText">GPS DISCONNECTED</span>
+        </div>
+        
+        <div class="metrics-grid">
+            <div class="metric-box"><span id="speed" class="m-val">0.0</span><span class="m-lab">KM/H</span></div>
+            <div class="metric-box"><span id="accuracy" class="m-val">--</span><span class="m-lab">Acc (M)</span></div>
+        </div>
+
+        <button id="trackBtn" class="btn btn-primary btn-full" style="width:100%; padding:14px; margin-bottom:10px" onclick="toggleTracking()">
+            <i class="fas fa-satellite"></i> Start Live Tracking
+        </button>
+        <button class="btn btn-full" style="width:100%; padding:14px; background: var(--bg-panel); color: var(--text);" onclick="saveFavorite()">
+            <i class="fas fa-star"></i> Save Current Destination
+        </button>
+    </div>
+
+    <div class="glass-panel favorites-panel" id="favPanel">
+        <strong style="font-size: 0.8em; text-transform: uppercase; opacity: 0.7;">⭐ Favorites</strong>
+        <div id="favList" style="margin-top:10px"></div>
+    </div>
+
+    <div class="search-bar">
+        <input type="text" id="destination" class="search-input" placeholder="Search address...">
+        <button class="btn btn-primary btn-round" onclick="searchLocation()">
+            <i class="fas fa-search"></i>
+        </button>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
+        const lightTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png');
+        const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png');
+        
+        lightTiles.addTo(map);
+
+        let watchId = null, userMarker = null, userCoords = null, routingControl = null;
+        let lastDest = null;
+        let favorites = JSON.parse(localStorage.getItem('gps_favs')) || [];
+
+        function toggleDarkMode() {
+            const isDark = document.body.classList.toggle('dark-mode');
+            const compass = document.getElementById('compass-ui');
+            if (isDark) {
+                map.removeLayer(lightTiles);
+                darkTiles.addTo(map);
+                compass.innerHTML = '<i class="fas fa-sun"></i>';
+            } else {
+                map.removeLayer(darkTiles);
+                lightTiles.addTo(map);
+                compass.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        }
+
+        async function searchLocation() {
+            const query = document.getElementById('destination').value;
+            if (!query || !userCoords) return alert("Enable tracking and enter address!");
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            if (data[0]) {
+                lastDest = { lat: data[0].lat, lon: data[0].lon, name: query };
+                startNavigation([data[0].lat, data[0].lon]);
+            }
+        }
+
+        function saveFavorite() {
+            if (!lastDest) return alert("Set a destination first!");
+            if (!favorites.find(f => f.name === lastDest.name)) {
+                favorites.push(lastDest);
+                localStorage.setItem('gps_favs', JSON.stringify(favorites));
+                renderFavorites();
+            }
+        }
+
+        function renderFavorites() {
+            const list = document.getElementById('favList');
+            list.innerHTML = favorites.map((f, i) => `
+                <div class="fav-item" onclick="startNavigation([${f.lat}, ${f.lon}])">
+                    <span>📍 ${f.name.substring(0, 15)}...</span>
+                    <i class="fas fa-times" onclick="removeFav(event, ${i})"></i>
+                </div>
+            `).join('');
+        }
+
+        function removeFav(e, index) {
+            e.stopPropagation();
+            favorites.splice(index, 1);
+            localStorage.setItem('gps_favs', JSON.stringify(favorites));
+            renderFavorites();
+        }
+
+        function toggleTracking() {
+            const btn = document.getElementById('trackBtn');
+            if (!watchId) {
+                watchId = navigator.geolocation.watchPosition(pos => {
+                    const { latitude, longitude, speed, accuracy } = pos.coords;
+                    userCoords = [latitude, longitude];
+                    document.getElementById('speed').innerText = speed ? (speed * 3.6).toFixed(1) : "0.0";
+                    document.getElementById('accuracy').innerText = accuracy.toFixed(0);
+                    if (!userMarker) {
+                        userMarker = L.circleMarker(userCoords, { radius: 10, color: '#fff', fillColor: '#6366f1', fillOpacity: 1 }).addTo(map);
+                        map.setView(userCoords, 15);
+                    } else userMarker.setLatLng(userCoords);
+                    document.getElementById('statusDot').classList.add('dot-active');
+                    document.getElementById('statusText').innerText = "LIVE SIGNAL";
+                }, null, { enableHighAccuracy: true });
+                btn.classList.add('btn-track-active');
+                btn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+            } else {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                btn.classList.remove('btn-track-active');
+                btn.innerHTML = '<i class="fas fa-satellite"></i> Start';
+            }
+        }
+
+        function startNavigation(dest) {
+            if (routingControl) map.removeControl(routingControl);
+            routingControl = L.Routing.control({
+                waypoints: [L.latLng(userCoords), L.latLng(dest)],
+                lineOptions: { styles: [{ color: '#10b981', weight: 6 }] }
+            }).addTo(map);
+        }
+
+        renderFavorites();
+    </script>
+</body>
+</html>
