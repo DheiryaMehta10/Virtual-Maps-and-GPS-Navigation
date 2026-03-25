@@ -1,4 +1,4 @@
-# 🌌 Ultimate GPS Navigator Pro+
+# 🚀 Virtual-Maps-and-GPS-Navigation
 
 > **"Precision meets elegance. Navigate your world with a glassmorphism interface designed for the modern explorer."**
 
